@@ -4,6 +4,7 @@ import ast
 import os
 import requests
 import json
+import sys
 
 
 class Connect:
@@ -37,9 +38,45 @@ class Connect:
     def set_coord(self, x, y, direction):
         payload = {
             "method": "set_coord",
-            "params": [x, y, direction, id],
+            "params": [x, y, direction, self.id],
             "jsonrpc": "2.0",
             "id": 0,
         }
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
+        return response
+
+
+class Sprite:
+    pass
+
+
+class Unit:
+    def __init__(self, x, y, sprite):
+        self.x = x
+        self.y = y
+        self.sprite = sprite
+
+    def render(self, window):
+        window.blit(self.sprite, (self.x, self.y))
+
+
+class Hero(Unit):
+    def get_collision_list(self, unitlist):
+        pass
+
+    def move(self, keys):
+        pass
+
+
+class Platform(Unit):
+    pass
+
+
+class Weapon(Unit):
+    pass
+
+
+class OtherPlayer(Unit):
+    pass
+
