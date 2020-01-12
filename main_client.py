@@ -60,14 +60,21 @@ class Unit:
 
 
 class Hero(Unit):
-    G = 10
-    K_MOVE = 0.8
-    jump_force = 0
+    def __init__(self):
+        self.G = 10
+        self.K_MOVE = 0.8
+        self.jump_force = 0
+        self.speed = 10
+
     def get_collision_list(self, unitlist):
         pass
 
     def move(self, forces, keys):
         result_force = (0, 0)
+        if keys[pygame.K_a]:
+            result_force[0] -= self.speed
+        if keys[pygame.K_d]:
+            result_force[0] += self.speed
         for force in forces:
             result_force[0] += force[0]
             result_force[1] += force[1]
