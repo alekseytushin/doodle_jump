@@ -14,7 +14,6 @@ class Connect:
         """
         self.url = "http://tushin.ru:4000/jsonrpc"
         self.headers = {'content-type': 'application/json'}
-        self.user_id = False
 
     def add_user(self):
         """
@@ -47,7 +46,7 @@ class Connect:
             self.url, data=json.dumps(payload), headers=self.headers).json()
         return response['result']
 
-    def set_coord(self, x, y, direction):
+    def set_coord(self, x, y, direction, num_id):
         """
         Функция, для записывания координат игрока на сервер.
         На вход получает координаты(x, y) и направление движения человека.
@@ -55,7 +54,7 @@ class Connect:
         """
         payload = {
             "method": "set_coord",
-            "params": [x, y, direction, self.user_id],
+            "params": [x, y, direction, num_id],
             "jsonrpc": "2.0",
             "id": 0,
         }

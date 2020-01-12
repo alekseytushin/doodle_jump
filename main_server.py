@@ -20,7 +20,7 @@ def add_user():
         players.append([1680, 0, 'left'])
     elif len(players) == 4:
         return False
-    return len(players) - 1
+    return len(players)
 
 
 @dispatcher.add_method
