@@ -4,23 +4,17 @@ from jsonrpc import JSONRPCResponseManager, dispatcher
 
 
 @dispatcher.add_method
-def add_user():
+def new_user():
     """
     Функция, которая отвечает за обработку запросов и формирования ответа.
     Возвращает False если мест на сервере нет, либо возвращает user_id
     """
     global players
-    if len(players) == 0:
-        players.append([240, 0, 1])
-    elif len(players) == 1:
-        players.append([720, 0, 1])
-    elif len(players) == 2:
-        players.append([1200, 0, 0])
-    elif len(players) == 3:
-        players.append([1680, 0, 0])
-    elif len(players) == 4:
-        return False
-    return len(players)
+    for i in range(len(players)):
+        if len(players[i]) == 0:
+            players[i] = [240 + i * 480, 0, i % 2]
+            return i
+    return False
 
 
 @dispatcher.add_method
@@ -30,6 +24,16 @@ def number():
     """
     global players
     return players
+
+
+@dispatcher.add_method
+def disconnect(user_id):
+    """
+    Функция, которая удаляет персонажа с поля
+    """
+    global players
+    players[user_id] = []
+    return
 
 
 @dispatcher.add_method
@@ -53,5 +57,5 @@ def application(request):
 
 
 if __name__ == '__main__':
-    players = []
+    players = [[], [], [], []]
     run_simple('192.168.10.5', 4000, application)

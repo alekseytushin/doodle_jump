@@ -29,7 +29,6 @@ class Connect:
         }
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
-        self.user_id = response['result']
         return response['result']
 
     def get_unitlist(self):
@@ -67,7 +66,7 @@ class Connect:
         Функция для выхода из игры.
         """
         payload = {
-            "method": "set_coord",
+            "method": "disconnect",
             "params": [user_id],
             "jsonrpc": "2.0",
             "id": 0,
@@ -101,14 +100,19 @@ class AnimatedSprite(pygame.sprite.Sprite):
 
 
 class Unit:
-    def __init__(self, x, y, direction, num, obj):
+    def __init__(self, x, y, direction, num, obj, img=None):
         image = [['first_user_left.png', 'first_user_right.png']]
         self.x = x
         self.y = y
         self.obj = obj
-        self.imgheight = 512
-        self.imgwidth = 256
-        self.sprite = pygame.image.load(image[num][direction])
+        if obj == 'player':
+            self.imgheight = 400
+            self.imgwidth = 500
+            self.sprite = pygame.image.load(image[0][direction])
+        else:
+            self.sprite = img
+            self.imgwidth = img.get_width()
+            self.imgheight = img.get_height()
 
     def render(self, window):
         window.blit(self.sprite, (self.x, self.y))
@@ -124,22 +128,21 @@ class Hero:
         self.y = y
         self.num_id = num_id
         self.direction = direction
-        self.imgheight = 512
-        self.imgwidth = 256
+        self.imgheight = 400
+        self.imgwidth = 500
+        self.speed = 10
 
-    def get_collision_list(self, unitlist):
-        if unitlist.obj == 'player':
-            if self.x + self.imgwidth > unitlist.x and self.x < unitlist.x + unitlist.imgwidth:
-                if unitlist.y + 3 <= self.y + self.imgheight < unitlist.y + unitlist.imgheight:
-                    self.x -= self.x + self.imgwidth - unitlist.x - 3
-        elif unitlist.obj == 'ground':
-            if self.x + self.imgwidth > unitlist.x and self.x < unitlist.x + unitlist.imgwidth:
-                if unitlist.y + 3 <= self.y + self.imgheight < unitlist.y + unitlist.imgheight:
-                    self.y -= self.y + self.imgheight - unitlist.y - 3
+    def get_collision_list(self, unit):
+        if unit.obj == 'player':
+            pass
+        elif unit.obj == 'ground':
+            if self.x + self.imgwidth >= unit.x >= self.x or unit.x + unit.imgwidth >= self.x >= unit.x:
+                if self.y + self.imgheight >= unit.y + 20 and self.y + self.imgheight < unit.y + unit.imgheight:
+                    self.y = unit.y - 20 - self.imgheight
                     self.onGround = True
 
-    def move(self, forces, keys, connection):
-        result_force = (0, 0)
+    def move(self, forces, keys, connection, UNITLIST):
+        result_force = [0, 0]
         for force in forces:
             result_force[0] += force[0]
             result_force[1] += force[1]
@@ -153,21 +156,21 @@ class Hero:
         if keys[pygame.K_d]:
             self.x += self.speed * self.K_MOVE
             self.direction = 1
-
-        # for jump
         if keys[pygame.K_SPACE]:
             if self.onGround:
                 self.onGround = False
-                self.jump_force = 100
-        # for jump
-        if self.jump_force > 20:
-            self.y -= self.jump_force * self.K_MOVE / 5
-            self.jump_force -= self.jump_force / 10
-        connection.set_coords(self.x, self.y, self.direction, self.num_id)
+                self.jump_force = 500
+                self.y -= self.jump_force * self.K_MOVE
+                self.jump_force -= self.jump_force / 10
+
+        for i in range(len(UNITLIST)):
+            self.get_collision_list(UNITLIST[i])
+        connection.set_coord(self.x, self.y, self.direction, self.num_id)
 
 
 class Platform(Unit):
-    pass
+    def __init__(self, x, y, image):
+        Unit.__init__(self, x, y, 0, 0, 'ground', img=image)
 
 
 class Weapon(Unit):
@@ -187,32 +190,46 @@ class Client:
         character = Hero(players[character_id][0], players[character_id][1], players[character_id][2], character_id)
         run = True
         bg = pygame.image.load("bg.png")
+        clock = pygame.time.Clock()
+        Plats = []
+        num = 1
+        xPL = 230
+        yPL = 800
         while run:
-            pygame.time.delay(10)
+            self.UNITLIST = []
             window.blit(bg, (0, 0))
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
-            if pygame.key.get_pressed():
-                character.move([(0, 7 * 10)], pygame.key.get_pressed(), connection)
-            self.UNITLIST = []
             players = connection.get_unitlist()
-            for i in range(players):
-                self.UNITLIST.append(Unit(players[i][0], players[i][1], players[i][2], i, 'player'))
+            for i in range(len(players)):
+                if len(players[i]) != 0 and (1920 + 512) > players[i][0] > -512 and (1080 + 512) > players[i][1] > -512:
+                    self.UNITLIST.append(Unit(players[i][0], players[i][1], players[i][2], i, 'player'))
+            for i in range(num):
+                Plats.append(Platform(xPL, yPL, pygame.image.load("Platform.jpg")))
+                self.UNITLIST.append(Plats[-1])
+                xPL += 5
+            if pygame.key.get_pressed():
+                character.move([(0, 7 * 10)], pygame.key.get_pressed(), connection, self.UNITLIST)
             for unit in self.UNITLIST:
                 unit.render(window)
             pygame.display.update()
+            clock.tick(240)
         pygame.quit()
 
 
 def main():
-    connection = Connect()
-    char_id = connection.add_user()
-    if not char_id:
-        print("Connection failed!")
-        exit()
-    client = Client(connection, char_id)
-    connection.disconnect(char_id)
+    try:
+        connection = Connect()
+        char_id = connection.add_user()
+        if char_id != 0 and char_id == False:
+            print("Connection failed!")
+            exit()
+        client = Client(connection, char_id)
+        connection.disconnect(char_id)
+    except Exception as e:
+        print(str(e))
+        connection.disconnect(char_id)
 
 
 if __name__ == "__main__":
