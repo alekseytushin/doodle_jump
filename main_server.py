@@ -27,7 +27,7 @@ def number():
 
 
 @dispatcher.add_method
-def set_coord(x, y, direction):
+def set_coord(x, y, direction, user_id):
     con = sqlite3.connect('C:\\Users\\Admin\\Desktop\\server\\new.db')
     cur = con.cursor()
     result = cur.execute("""SELECT kW,Daytime,Night,Special,Extrainformation,debt FROM counter

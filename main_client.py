@@ -22,6 +22,7 @@ class Connect:
         }
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
+        self.user_id = response['result']
         return response
 
     def update_coord_of_people(self):
@@ -38,7 +39,7 @@ class Connect:
     def set_coord(self, x, y, direction):
         payload = {
             "method": "set_coord",
-            "params": [x, y, direction, self.id],
+            "params": [x, y, direction, self.user_id],
             "jsonrpc": "2.0",
             "id": 0,
         }
