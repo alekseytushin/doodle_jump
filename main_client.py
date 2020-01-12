@@ -60,11 +60,21 @@ class Unit:
 
 
 class Hero(Unit):
+    G = 10
+    K_MOVE = 0.8
+    jump_force = 0
     def get_collision_list(self, unitlist):
         pass
 
-    def move(self, keys):
-        pass
+    def move(self, forces, keys):
+        result_force = (0, 0)
+        for force in forces:
+            result_force[0] += force[0]
+            result_force[1] += force[1]
+        result_force[1] += jump_force
+        movement_by_force = (0, 0)
+        movement_by_force[0] = result_force[0] * self.K_MOVE
+        movement_by_force[1] = result_force[1] * self.K_MOVE
 
 
 class Platform(Unit):
@@ -77,3 +87,17 @@ class Weapon(Unit):
 
 class OtherPlayer(Unit):
     pass
+
+
+class Client:
+    def __init__(self, connection):
+        pass
+
+
+def main():
+    connection = Connect()
+    if not connection.add_user():
+        print("Connection failed!")
+        input()
+        exit()
+    client = Client(connection)
