@@ -10,10 +10,11 @@ class Connect:
     def __init__(self):
         self.url = "http://tushin.ru:4000/jsonrpc"
         self.headers = {'content-type': 'application/json'}
+        self.user_id = False
 
-    def number_of_people(self):
+    def add_user(self):
         payload = {
-            "method": "number",
+            "method": "new_user",
             "params": [],
             "jsonrpc": "2.0",
             "id": 0,
@@ -24,7 +25,7 @@ class Connect:
 
     def update_coord_of_people(self):
         payload = {
-            "method": "get_info",
+            "method": "number",
             "params": [],
             "jsonrpc": "2.0",
             "id": 0,
@@ -36,10 +37,9 @@ class Connect:
     def set_coord(self, x, y, direction):
         payload = {
             "method": "set_coord",
-            "params": [x, y, direction],
+            "params": [x, y, direction, id],
             "jsonrpc": "2.0",
             "id": 0,
         }
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
-        return response
