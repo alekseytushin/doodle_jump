@@ -4,7 +4,7 @@ import ast
 import os
 import requests
 import json
-
+import sys
 
 class Connect:
     def __init__(self):
@@ -45,6 +45,35 @@ class Connect:
         return response
 
 
+class Sprite:
+    pass
+
+
 class Unit:
-    def __init__():
+    def __init__(self, x, y, sprite):
+        self.x = x
+        self.y = y
+        self.sprite = sprite
+
+    def render(self, window):
+        window.blit(self.sprite, (self.x, self.y))
+
+
+class Hero(Unit):
+    def get_collision_list(self, unitlist):
         pass
+
+    def move(self, keys):
+        pass
+
+
+class Platform(Unit):
+    pass
+
+
+class Weapon(Unit):
+    pass
+
+
+class OtherPlayer(Unit):
+    pass
