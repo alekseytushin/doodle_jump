@@ -43,3 +43,8 @@ class Connect:
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
         return response
+
+
+class Unit:
+    def __init__():
+        pass
