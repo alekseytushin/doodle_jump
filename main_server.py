@@ -8,13 +8,13 @@ import sqlite3
 def add_user():
     global players
     if len(players) == 0:
-        players.append(0, 0, 'right')  # изменить
+        players.append([0, 0, 'right'])  # изменить
     elif len(players) == 1:
-        players.append(0, 0, 'right')  # изменить
+        players.append([0, 0, 'right'])  # изменить
     elif len(players) == 2:
-        players.append(0, 0, 'left')  # изменить
+        players.append([0, 0, 'left'])  # изменить
     elif len(players) == 3:
-        players.append(0, 0, 'left')  # изменить
+        players.append([0, 0, 'left'])  # изменить
     elif len(players) == 4:
         return False
     return len(players) - 1

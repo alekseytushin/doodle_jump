@@ -9,11 +9,19 @@ import sys
 
 class Connect:
     def __init__(self):
+        """
+        Класс по подключению игрока к серверу.
+        """
         self.url = "http://tushin.ru:4000/jsonrpc"
         self.headers = {'content-type': 'application/json'}
         self.user_id = False
 
     def add_user(self):
+        """
+        Функция по добавлению пользователя в игровую сессию
+        Возвращает False, если все места заняты.
+        Возвращает user_id если на сервере есть место.
+        """
         payload = {
             "method": "new_user",
             "params": [],
@@ -23,9 +31,12 @@ class Connect:
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
         self.user_id = response['result']
-        return response
+        return response['result']
 
     def update_coord_of_people(self):
+        """
+        Фукция, которая возвращает список игроков с их координатами и направлением
+        """
         payload = {
             "method": "number",
             "params": [],
@@ -34,9 +45,14 @@ class Connect:
         }
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
-        return response
+        return response['result']
 
     def set_coord(self, x, y, direction):
+        """
+        Функция, для записывания координат игрока на сервер.
+        На вход получает координаты(x, y) и направление движения человека.
+        Возвращает True, если можно переместиться или False если клетка занята
+        """
         payload = {
             "method": "set_coord",
             "params": [x, y, direction, self.user_id],
@@ -45,7 +61,7 @@ class Connect:
         }
         response = requests.post(
             self.url, data=json.dumps(payload), headers=self.headers).json()
-        return response
+        return response['result']
 
 
 class Sprite:
