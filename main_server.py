@@ -1,7 +1,6 @@
 from werkzeug.wrappers import Request, Response
 from werkzeug.serving import run_simple
 from jsonrpc import JSONRPCResponseManager, dispatcher
-import sqlite3
 
 
 @dispatcher.add_method
