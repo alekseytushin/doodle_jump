@@ -11,13 +11,13 @@ def add_user():
     """
     global players
     if len(players) == 0:
-        players.append([240, 0, 'right'])
+        players.append([240, 0, 1])
     elif len(players) == 1:
-        players.append([720, 0, 'right'])
+        players.append([720, 0, 1])
     elif len(players) == 2:
-        players.append([1200, 0, 'left'])
+        players.append([1200, 0, 0])
     elif len(players) == 3:
-        players.append([1680, 0, 'left'])
+        players.append([1680, 0, 0])
     elif len(players) == 4:
         return False
     return len(players)

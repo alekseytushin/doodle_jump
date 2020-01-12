@@ -32,7 +32,7 @@ class Connect:
         self.user_id = response['result']
         return response['result']
 
-    def update_coord_of_people(self):
+    def get_unitlist(self):
         """
         Фукция, которая возвращает список игроков с их координатами и направлением
         """
@@ -62,6 +62,20 @@ class Connect:
             self.url, data=json.dumps(payload), headers=self.headers).json()
         return response['result']
 
+    def disconnect(self, user_id):
+        """
+        Функция для выхода из игры.
+        """
+        payload = {
+            "method": "set_coord",
+            "params": [user_id],
+            "jsonrpc": "2.0",
+            "id": 0,
+        }
+        response = requests.post(
+            self.url, data=json.dumps(payload), headers=self.headers).json()
+        return
+
 
 class AnimatedSprite(pygame.sprite.Sprite):
     def __init__(self, sheet, columns, rows, x, y):
@@ -86,38 +100,70 @@ class AnimatedSprite(pygame.sprite.Sprite):
         self.image = self.frames[self.cur_frame]
 
 
-class Sprite:
-    pass
-
-
 class Unit:
-    def __init__(self, x, y, sprite):
+    def __init__(self, x, y, direction, num, obj):
+        image = [['first_user_left.png', 'first_user_right.png']]
         self.x = x
         self.y = y
-        self.sprite = sprite
+        self.obj = obj
+        self.imgheight = 512
+        self.imgwidth = 256
+        self.sprite = pygame.image.load(image[num][direction])
 
     def render(self, window):
         window.blit(self.sprite, (self.x, self.y))
 
 
-class Hero(Unit):
-    def __init__(self):
+class Hero:
+    def __init__(self, x, y, direction, num_id):
         self.G = 10
         self.K_MOVE = 0.8
         self.jump_force = 0
+        self.onGround = False
+        self.x = x
+        self.y = y
+        self.num_id = num_id
+        self.direction = direction
+        self.imgheight = 512
+        self.imgwidth = 256
 
     def get_collision_list(self, unitlist):
-        pass
+        if unitlist.obj == 'player':
+            if self.x + self.imgwidth > unitlist.x and self.x < unitlist.x + unitlist.imgwidth:
+                if unitlist.y + 3 <= self.y + self.imgheight < unitlist.y + unitlist.imgheight:
+                    self.x -= self.x + self.imgwidth - unitlist.x - 3
+        elif unitlist.obj == 'ground':
+            if self.x + self.imgwidth > unitlist.x and self.x < unitlist.x + unitlist.imgwidth:
+                if unitlist.y + 3 <= self.y + self.imgheight < unitlist.y + unitlist.imgheight:
+                    self.y -= self.y + self.imgheight - unitlist.y - 3
+                    self.onGround = True
 
-    def move(self, forces, keys):
+    def move(self, forces, keys, connection):
         result_force = (0, 0)
         for force in forces:
             result_force[0] += force[0]
             result_force[1] += force[1]
         result_force[1] += self.jump_force
-        movement_by_force = [0, 0]
-        movement_by_force[0] = result_force[0] * self.K_MOVE
-        movement_by_force[1] = result_force[1] * self.K_MOVE
+        self.x += result_force[0] * self.K_MOVE
+        self.y += result_force[1] * self.K_MOVE
+
+        if keys[pygame.K_a]:
+            self.x -= self.speed * self.K_MOVE
+            self.direction = 0
+        if keys[pygame.K_d]:
+            self.x += self.speed * self.K_MOVE
+            self.direction = 1
+
+        # for jump
+        if keys[pygame.K_SPACE]:
+            if self.onGround:
+                self.onGround = False
+                self.jump_force = 100
+        # for jump
+        if self.jump_force > 20:
+            self.y -= self.jump_force * self.K_MOVE / 5
+            self.jump_force -= self.jump_force / 10
+        connection.set_coords(self.x, self.y, self.direction, self.num_id)
 
 
 class Platform(Unit):
@@ -131,3 +177,43 @@ class Weapon(Unit):
 class OtherPlayer(Unit):
     pass
 
+
+class Client:
+    def __init__(self, connection, character_id):
+        pygame.init()
+        pygame.display.set_caption("Stick Fight The Game")
+        window = pygame.display.set_mode((1920, 1080), flags=pygame.FULLSCREEN)
+        players = connection.get_unitlist()
+        character = Hero(players[character_id][0], players[character_id][1], players[character_id][2], character_id)
+        run = True
+        bg = pygame.image.load("bg.png")
+        while run:
+            pygame.time.delay(10)
+            window.blit(bg, (0, 0))
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+            if pygame.key.get_pressed():
+                character.move([(0, 7 * 10)], pygame.key.get_pressed(), connection)
+            self.UNITLIST = []
+            players = connection.get_unitlist()
+            for i in range(players):
+                self.UNITLIST.append(Unit(players[i][0], players[i][1], players[i][2], i, 'player'))
+            for unit in self.UNITLIST:
+                unit.render(window)
+            pygame.display.update()
+        pygame.quit()
+
+
+def main():
+    connection = Connect()
+    char_id = connection.add_user()
+    if not char_id:
+        print("Connection failed!")
+        exit()
+    client = Client(connection, char_id)
+    connection.disconnect(char_id)
+
+
+if __name__ == "__main__":
+    main()
