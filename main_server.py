@@ -6,6 +6,10 @@ import sqlite3
 
 @dispatcher.add_method
 def add_user():
+    """
+    Функция, которая отвечает за обработку запросов и формирования ответа.
+    Возвращает False если мест на сервере нет, либо возвращает user_id
+    """
     global players
     if len(players) == 0:
         players.append([0, 0, 'right'])  # изменить
@@ -22,22 +26,28 @@ def add_user():
 
 @dispatcher.add_method
 def number():
+    """
+    Функция, которая возвращает всю информацию о игроках.
+    """
     global players
     return players
 
 
 @dispatcher.add_method
 def set_coord(x, y, direction, user_id):
-    con = sqlite3.connect('C:\\Users\\Admin\\Desktop\\server\\new.db')
-    cur = con.cursor()
-    result = cur.execute("""SELECT kW,Daytime,Night,Special,Extrainformation,debt FROM counter
-                            WHERE id == """ + str(user_id)).fetchone()
-    con.close()
-    return result
+    """
+    Функция, которая обновляет координаты и направление игрока.
+    """
+    global players
+    players[user_id] = (x, y, direction)
+    return True
 
 
 @Request.application
 def application(request):
+    """
+    Обработка всех входящих запросов
+    """
     response = JSONRPCResponseManager.handle(
         request.data, dispatcher)
     return Response(response.json, mimetype='application/json')
