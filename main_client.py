@@ -2,223 +2,463 @@ import pygame
 from pygame.locals import *
 import ast
 import os
-import socket
 import sys
 import time
-
-
-class Connect:
-    def __init__(self):
-        self.sock = socket.socket()
-        self.sock.connect(("212.33.255.45", 4000))
-
-    def add_user(self):
-        """
-        Функция по добавлению пользователя в игровую сессию
-        Возвращает False, если все места заняты.
-        Возвращает user_id если на сервере есть место.
-        """
-
-        self.sock.send(b'new_user')
-        answer = self.sock.recv(512).decode("utf-8")
-        if answer.isdigit():
-            answer = int(answer)
-        return answer
-
-    def get_unitlist(self):
-        """
-        Фукция, которая возвращает список игроков с их координатами и направлением
-        """
-        self.sock.send(b'number')
-        answer = eval(self.sock.recv(512).decode("utf-8"))
-        return answer
-
-    def set_coord(self, x, y, direction, num_id, sprite_num):
-        """
-        Функция, для записывания координат игрока на сервер.
-        На вход получает координаты(x, y) и направление движения человека.
-        Возвращает True, если можно переместиться или False если клетка занята
-        """
-        string = ' '.join([str(x), str(y), str(direction), str(num_id), str(sprite_num)])
-        self.sock.send(b'set_coord')
-        self.sock.send(str(len(string)).encode("utf-8"))
-        self.sock.send(string.encode("utf-8"))
-
-    def disconnect(self, user_id):
-        """
-        Функция для выхода из игры.
-        """
-        self.sock.send(b'disconnect')
-        self.sock.send(str(user_id).encode("utf-8"))
-        self.sock.close()
+import random
+import math
 
 
 class Unit:
-    def __init__(self, x, y, direction, num, obj, img=None, sprite_num=None):
+    def __init__(self, x, y, direction, num, obj, img=None, color=None, spring=None):
         self.x = x
         self.y = y
         self.obj = obj
-        walkRight = [pygame.image.load('game_files/pygame_right_1.png'),
-                     pygame.image.load('game_files/pygame_right_2.png'),
-                     pygame.image.load('game_files/pygame_right_3.png'),
-                     pygame.image.load('game_files/pygame_right_4.png'),
-                     pygame.image.load('game_files/pygame_right_5.png'),
-                     pygame.image.load('game_files/pygame_right_6.png')]
-
-        walkLeft = [pygame.image.load('game_files/pygame_left_1.png'),
-                    pygame.image.load('game_files/pygame_left_2.png'),
-                    pygame.image.load('game_files/pygame_left_3.png'),
-                    pygame.image.load('game_files/pygame_left_4.png'),
-                    pygame.image.load('game_files/pygame_left_5.png'),
-                    pygame.image.load('game_files/pygame_left_6.png')]
-
-        stand = pygame.image.load('game_files/pygame_idle.png')
-        if obj == 'player':
-            self.imgheight = 400
-            self.imgwidth = 500
-            if direction == 0:
-                self.sprite = walkLeft[sprite_num]
-            elif direction == 1:
-                self.sprite = walkRight[sprite_num]
-            elif direction == 2:
-                self.sprite = stand
-        else:
-            self.sprite = img
-            self.imgwidth = img.get_width()
-            self.imgheight = img.get_height()
+        self.red = False
+        self.jumped = False
+        self.spring_x = self.x + random.randint(5, 20)
+        self.spring_y = self.y - 25
+        self.direction = direction
+        if not (spring is None):
+            self.spring = spring
+        if not (color is None):
+            self.color = color
+        if obj == 'ground':
+            self.img = img
+            if len(img) == 2:
+                self.red = True
+            self.sprite = img[0]
+            self.width = self.sprite.get_width()
+            self.height = self.sprite.get_height()
 
     def render(self, window):
-        window.blit(self.sprite, (self.x, self.y))
+        if self.spring:
+            if self.jumped:
+                window.blit(pygame.image.load('game_files/jump_2.png').convert_alpha(),
+                            (self.spring_x, self.spring_y - 24))
+            else:
+                window.blit(pygame.image.load('game_files/jump_1.png').convert_alpha(),
+                            (self.spring_x, self.spring_y))
+
+        if self.color == 'blue':
+            if self.direction:
+                self.x += 5
+                self.spring_x += 5
+            else:
+                self.x -= 5
+                self.spring_x -= 5
+            if self.x >= 422:
+                self.direction = 0
+            elif self.x <= 0:
+                self.direction = 1
+
+        window.blit(self.sprite,
+                    (self.x, self.y))
+
+
+class AnimatedSprite(pygame.sprite.Sprite):
+    def __init__(self, sheet, columns, rows):
+        self.frames = []
+        self.cut_sheet(sheet, columns, rows)
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
+        self.rect = self.rect.move(-100, -100)
+
+    def cut_sheet(self, sheet, columns, rows):
+        self.rect = pygame.Rect(-100, -100, sheet.get_width() // columns,
+                                sheet.get_height() // rows)
+        for j in range(rows):
+            for i in range(columns):
+                frame_location = (self.rect.w * i, self.rect.h * j)
+                self.frames.append(sheet.subsurface(pygame.Rect(
+                    frame_location, self.rect.size)))
+
+    def update(self):
+        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+        self.image = self.frames[self.cur_frame]
 
 
 class Hero:
-    def __init__(self, x, y, direction, num_id):
-        self.G = 10
-        self.K_MOVE = 0.8
+    def __init__(self, x, y, direction, num_id=None):
+        self.K_MOVE = 0.7
         self.jump_force = 0
-        self.onGround = False
         self.x = x
         self.y = y
-        self.num_id = num_id
+        self.onGround = False
+        self.spring_y = False
+        self.onSpring = False
+        self.sprite = pygame.image.load('game_files/dodle_left.png').convert_alpha()
+        if not (num_id is None):
+            self.num_id = num_id
+        else:
+            self.num_id = 25
         self.direction = direction
-        self.imgheight = 71
-        self.imgwidth = 60
-        self.speed = 10
-        self.sprite_num = 0
+        self.height = 80
+        self.width = 80
+        self.speed = 15
+        self.jump = 400
 
-    def get_collision_list(self, unit):
-        if unit.obj == 'player':
-            pass
+    def collision(self, unit):
+        if unit.obj == 'enemy':
+            if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
+                if unit.y + unit.height <= self.y + self.height < unit.y + unit.height:
+                    self.death()
+
         elif unit.obj == 'ground':
-            if self.x + self.imgwidth >= unit.x >= self.x or unit.x + unit.imgwidth >= self.x >= unit.x:
-                if unit.y + 10 <= self.y + self.imgheight < unit.y + unit.imgheight:
-                    self.y = unit.y - self.imgheight
-                    self.onGround = True
+            if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
+                if unit.y + 8 <= self.y + self.height < unit.y + unit.height:
+                    if self.down:
+                        self.y = unit.y - self.height
+                        self.onGround = True
+                        second_jump = unit.jumped
+                        unit.jumped = True
 
-    def move(self, forces, keys, connection, UNITLIST):
+                        if unit.red:
+                            unit.sprite = unit.img[1]
+
+                        if unit.spring:
+                            self.onSpring = True
+                            self.y -= 24
+                        if not second_jump:
+                            return True
+        return False
+
+    def set_sprite(self, img):
+        self.sprite = img
+
+    def move(self, forces, keys, UNITLIST=None):
         result_force = [0, 0]
+
         for force in forces:
             result_force[0] += force[0]
             result_force[1] += force[1]
+
         result_force[1] += self.jump_force
         self.x += result_force[0] * self.K_MOVE / 5
         self.y += result_force[1] * self.K_MOVE / 5
 
         if keys[pygame.K_a]:
             self.x -= self.speed * self.K_MOVE
-            if self.direction == 1:
-                self.sprite_num = 0
-            self.direction = 0
-            self.sprite_num += 1
+            self.sprite = pygame.image.load('game_files/dodle_left.png').convert_alpha()
         elif keys[pygame.K_d]:
             self.x += self.speed * self.K_MOVE
-            if self.direction == 0:
-                self.sprite_num = 0
-            self.direction = 1
-            self.sprite_num += 1
-        else:
-            self.direction = 2
-            self.sprite_num = 0
-        if self.sprite_num > 5:
-            self.sprite_num = 0
+            self.sprite = pygame.image.load('game_files/dodle_right.png').convert_alpha()
 
-        if keys[pygame.K_SPACE]:
-            if self.onGround:
+        if self.onGround:
+            if self.onSpring:
+                self.onSpring = False
                 self.onGround = False
-                self.jump_force = 250
+                self.jump_force = self.jump
+            else:
+                self.onGround = False
+                self.jump_force = self.jump / 2
 
         # for jump
         if self.jump_force > 20:
-            self.y -= self.jump_force / 2
+            self.y -= self.jump_force / 2.3
             self.jump_force -= self.jump_force / 10
-
+            self.down = False
+        else:
+            self.down = True
+        if self.y < 0:
+            self.y = 0
+        if self.x < 0:
+            self.x = 0
+        elif self.x > (532 - self.width):
+            self.x = 532 - self.width
         for i in range(len(UNITLIST)):
-            self.get_collision_list(UNITLIST[i])
-        connection.set_coord(self.x, self.y, self.direction, self.num_id, self.sprite_num)
+            if self.collision(UNITLIST[i]):
+                return UNITLIST[i]
+        return False
+
+    def render(self, window):
+        window.blit(self.sprite, (self.x, self.y))
+
+    def death(self):
+        pass
 
 
 class Platform(Unit):
-    def __init__(self, x, y, image):
-        Unit.__init__(self, x, y, 0, 0, 'ground', img=image)
+    def __init__(self, x, y, image, num, spring):
+        colors = ['green',
+                  'blue',
+                  'red']
+        Unit.__init__(self, x, y, num, 0, 'ground', img=image, color=colors[num], spring=spring)
 
 
-class Weapon(Unit):
-    pass
+class Weapon:
+    def __init__(self, hero_x, hero_y, mouse_pos):
+        self.forces = [(0, 9 * 10)]
+        self.K_MOVE = 0.8
+        self.spring_y = 0
+        self.start_x = hero_x + 40
+        self.start_y = hero_y + 30
+        self.x = self.start_x - 7.5
+        self.y = self.start_y - 7.5
+        self.end_x = mouse_pos[0]
+        self.end_y = mouse_pos[1]
+        self.width = 15
+        self.height = 15
+        self.bullet_sprite = pygame.image.load('game_files/bullet.png').convert_alpha()
+        self.bullet_speed = 200
+        self.obj = 'bullet'
+        self.angle = 0
+
+    def render_shot_pic(self):
+        try:
+            angle = (self.start_y - self.end_y) / (self.start_x - self.end_x)
+        except:
+            return pygame.image.load('game_files/doodle_77_left.png')
+
+        self.angle = abs(math.degrees(math.atan(angle)) - 90)
+
+        if 0 < self.angle < 22.5:
+            return pygame.image.load('game_files/doodle_77_left.png')
+        elif 22.5 <= self.angle < 45:
+            return pygame.image.load('game_files/doodle_45_left.png')
+        elif 45 <= self.angle < 77.5:
+            return pygame.image.load('game_files/doodle_22_left.png')
+        elif 77.5 <= self.angle < 90:
+            return pygame.image.load('game_files/dodle_left.png')
+        elif self.angle > 180:
+            return pygame.image.load('game_files/doodle_90.png')
+        elif 90 < self.angle <= 112.5:
+            return pygame.image.load('game_files/dodle_right.png')
+        elif 112.5 < self.angle <= 135:
+            return pygame.image.load('game_files/doodle_22_right.png')
+        elif 135 < self.angle <= 157.5:
+            return pygame.image.load('game_files/doodle_45_right.png')
+        elif 157.5 < self.angle < 180:
+            return pygame.image.load('game_files/doodle_77_right.png')
+
+    def collision(self, enemy):
+        for unit in enemy:
+            if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
+                if unit.y <= self.y + self.height < unit.y + unit.height:
+                    return unit
+        return False
+
+    def move_bullet(self, forces):
+        result_force = [0, 0]
+        for force in forces:
+            result_force[0] += force[0]
+            result_force[1] += force[1]
+
+        result_force[1] += self.bullet_speed
+        self.x += result_force[0] * self.K_MOVE / 5
+        self.y += result_force[1] * self.K_MOVE / 5
+
+        if self.bullet_speed > 20:
+            self.y -= self.bullet_speed / 2
+            self.bullet_speed -= self.bullet_speed / 10
+        if self.angle > 90:
+            self.x += 15
+            self.y -= 20
+        elif self.angle > 0:
+            self.x -= 15
+            self.y -= 20
+
+    def render(self, window):
+        self.move_bullet(self.forces)
+        window.blit(self.bullet_sprite, (self.x, self.y))
 
 
-class OtherPlayer(Unit):
-    pass
+class Enemy:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.height = 52
+        self.width = 52
+        self.spring_y = 0
+        self.enemy = AnimatedSprite(pygame.image.load("game_files/enemy.png").convert_alpha(), 5, 2)
+        self.obj = 'enemy'
+
+    def render(self, window):
+        window.blit(self.enemy.image, (self.x, self.y))
+        self.enemy.update()
 
 
 class Client:
-    def __init__(self, connection, character_id):
+    def __init__(self):
+        self.plats = []
+        self.UNITLIST = []
+        self.all_bullets = []
+        self.enemy = []
+        self.account = 0
         pygame.init()
-        pygame.display.set_caption("Stick Fight The Game")
-        window = pygame.display.set_mode((1920, 1080), flags=pygame.FULLSCREEN)
-        players = connection.get_unitlist()
-        character = Hero(players[character_id][0], players[character_id][1], players[character_id][2], character_id)
-        run = True
-        bg = pygame.image.load("game_files/bg.png")
+        pygame.display.set_caption("Doodle jump")
+        pygame.mouse.set_visible(False)
+        window = pygame.display.set_mode((532, 850))
+        self.solo_game(window)
+
+    def restart_game(self, window):
+        self.plats = []
+        self.UNITLIST = []
+        self.all_bullets = []
+        self.enemy = []
+        self.account = 0
+        self.solo_game(window)
+
+    def solo_game(self, window):
+        bg = pygame.image.load("game_files/background.png").convert_alpha()
+        MANUAL_CURSOR = pygame.image.load('game_files/arrow.png').convert_alpha()
         clock = pygame.time.Clock()
-        Plats = []
-        num = 1
-        xPL = 230
-        yPL = 800
+        x = 250
+        y = 600
+        player = Hero(x, y, 0)
+        run = True
+        cou = times = coord = 0
+        wait_between_bullets = 15
+        game_pause = False
+        cost = 1500
         while run:
-            clock.tick(120)
-            self.UNITLIST = []
-            window.blit(bg, (0, 0))
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    run = False
-            players = connection.get_unitlist()
-            for i in range(len(players)):
-                if len(players[i]) != 0 and (1920 + 512) > players[i][0] > -512 and (1080 + 512) > players[i][1] > -512:
-                    self.UNITLIST.append(Unit(players[i][0], players[i][1],
-                                              players[i][2], i, 'player', sprite_num=players[i][3]))
-            Plats.append(Platform(xPL, yPL, pygame.image.load("game_files/Platform.jpg")))
-            self.UNITLIST.append(Plats[-1])
-            if pygame.key.get_pressed():
-                character.move([(0, 9 * 10)], pygame.key.get_pressed(), connection, self.UNITLIST)
-            for unit in self.UNITLIST:
-                unit.render(window)
-            pygame.display.update()
+            if not game_pause:
+                clock.tick(55)
+                window.blit(bg, (0, 0))
+                window.blit(MANUAL_CURSOR, (pygame.mouse.get_pos()))
+                pygame.display.set_caption(f"Your score - {str(self.account)}")
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        run = False
+                    elif (event.type == pygame.MOUSEBUTTONDOWN and
+                          pygame.mouse.get_pos()[1] < (player.y + 20) and wait_between_bullets > 15):
+                        wait_between_bullets = 0
+                        bullet = Weapon(player.x, player.y,
+                                        pygame.mouse.get_pos())
+                        player.set_sprite(bullet.render_shot_pic())
+                        self.all_bullets.append(bullet)
+
+                self.add_platforms()
+                wait_between_bullets += 1
+                self.bullets_collision()
+
+                if self.account > cost:
+                    self.create_enemy()
+                    cost += random.randint(400, 2000)
+
+                if pygame.key.get_pressed():
+                    if pygame.key.get_pressed()[pygame.K_r]:
+                        self.restart_game(window)
+                        return
+                    answer = player.move([(0, 7 * 10)], pygame.key.get_pressed(), UNITLIST=self.UNITLIST)
+                    if answer:
+                        if answer.obj == 'ground' and answer.spring:
+                            self.account += random.randint(150, 1000)
+                            coord = 30
+                            times = 22
+                            cou = 0
+                        else:
+                            self.account += random.randint(50, 200)
+                            coord = 10.5
+                            times = 21.5
+                            cou = 0
+
+                self.UNITLIST.extend(self.all_bullets)
+                self.UNITLIST.append(player)
+
+                for enemy in self.enemy:
+                    if enemy.y > 860:
+                        del enemy
+                        continue
+                    if enemy not in self.UNITLIST:
+                        self.UNITLIST.append(enemy)
+
+                if cou < times:
+                    cou += 1
+                    for unit in self.UNITLIST:
+                        unit.y += coord
+                        unit.spring_y += coord
+                else:
+                    cou = 0
+                    times = 0
+                    coord = 0
+
+                for unit in self.UNITLIST:
+                    unit.render(window)
+
+                self.UNITLIST = []
+                pygame.display.update()
+            if pygame.key.get_pressed()[pygame.K_ESCAPE]:
+                if game_pause:
+                    game_pause = False
+                else:
+                    game_pause = True
         pygame.quit()
 
+    def create_enemy(self):
+        green_plat = [pygame.image.load("game_files/green_platform.png").convert_alpha()]
+        enemy_plat_y = self.plats[-1].y
 
-def main():
-    try:
-        connection = Connect()
-        char_id = connection.add_user()
-        if char_id != 0 and char_id == False:
-            print("Connection failed!")
-            exit()
-        client = Client(connection, char_id)
-        connection.disconnect(char_id)
-    except Exception as e:
-        print(str(e))
-        connection.disconnect(char_id)
+        for i in range(5):
+            spring = False
+            random_number = random.randint(1, 10)
+            if random_number % 2 == 0:
+                self.plats.append(Platform(120 * i,
+                                           enemy_plat_y - 250,
+                                           green_plat, 0,
+                                           spring))
+                self.enemy.append(Enemy(120 * i + 25, enemy_plat_y - 302))
+                self.UNITLIST.append(self.plats[-1])
+                self.UNITLIST.append(self.enemy[-1])
+
+    def bullets_collision(self):
+        for bullet in self.all_bullets:
+            if bullet.x < 0 or bullet.y < 0 or bullet.x > 532 or bullet.y > 850:
+                del bullet
+                continue
+            answer = bullet.collision(self.enemy)
+            if answer:
+                del bullet
+                self.account += random.randint(500, 1500)
+                for i in range(len(self.enemy)):
+                    if self.enemy[i].x == answer.x and self.enemy[i].y == answer.y:
+                        self.enemy.pop(i)
+                        break
+
+    def add_platforms(self):
+        green_plat = [pygame.image.load("game_files/green_platform.png").convert_alpha()]
+        blue_plat = [pygame.image.load("game_files/blue_platform.png").convert_alpha()]
+        red_plat = [pygame.image.load("game_files/red_platform.png").convert_alpha(),
+                    pygame.image.load("game_files/broken_red_platform.png").convert_alpha()]
+        colors_of_plats = [green_plat,
+                           blue_plat,
+                           red_plat]
+        spring = False
+        spring_num = [random.randint(0, 24),
+                      random.randint(0, 24),
+                      random.randint(0, 24)]
+
+        for i in range(len(self.plats)):
+            if self.plats[i].y > 850 or (self.plats[i].red and self.plats[i].jumped):
+                self.plats.pop(i)
+                num_of_plat = random.randint(0, 2)
+                if i in spring_num and num_of_plat != 2:
+                    spring = True
+                self.plats.append(Platform(random.randint(0, 422),
+                                           self.plats[-1].y - random.randint(50, 200),
+                                           colors_of_plats[num_of_plat],
+                                           num_of_plat,
+                                           spring))
+                spring = False
+
+        if len(self.plats) == 0:
+            n = 10
+            for i in range(5):
+                self.plats.append(Platform(120 * i, 800,
+                                           green_plat, 0,
+                                           spring))
+            for i in range(n):
+                num_of_plat = random.randint(0, 2)
+                if i in spring_num and num_of_plat != 2:
+                    spring = True
+                self.plats.append(Platform(random.randint(0, 422),
+                                           self.plats[-1].y - random.randint(50, 200),
+                                           colors_of_plats[num_of_plat],
+                                           num_of_plat,
+                                           spring))
+                spring = False
+
+        self.UNITLIST.extend(self.plats)
 
 
 if __name__ == "__main__":
-    main()
+    client = Client()
