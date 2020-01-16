@@ -127,8 +127,8 @@ class Hero:
         :return:
         """
         if unit.obj == 'enemy':
-            if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
-                if self.y + self.height >= unit.y >= self.y or unit.y + unit.height >= self.y >= unit.y:
+            if self.x <= unit.x <= (self.x + self.width) or unit.x <= self.x <= (unit.x + unit.width):
+                if self.y <= unit.y <= (self.y + self.height) or unit.y <= self.y <= (unit.y + unit.height):
                     self.death()
                     return True
 
@@ -136,14 +136,15 @@ class Hero:
             if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
                 if unit.y + 8 <= self.y + self.height < unit.y + unit.height:
                     if self.down:
-                        self.y = unit.y - self.height
                         self.onGround = True
                         second_jump = unit.jumped
                         unit.jumped = True
 
                         if unit.red:
                             unit.sprite = unit.img[1]
-
+                            self.onGround = False
+                            return False
+                        self.y = unit.y - self.height
                         if unit.spring:
                             self.onSpring = True
                             self.y -= 24
@@ -449,6 +450,13 @@ class Client:
             if self.account > cost:
                 self.create_enemy()
                 cost += random.randint(400, 2000)
+                
+            for enemy in self.enemy:
+                if enemy.y > 860:
+                    del enemy
+                    continue
+                if enemy not in self.UNITLIST:
+                    self.UNITLIST.append(enemy)            
 
             if pygame.key.get_pressed():
                 if pygame.key.get_pressed()[pygame.K_r]:
@@ -466,13 +474,6 @@ class Client:
 
             self.UNITLIST.extend(self.all_bullets)
             self.UNITLIST.append(player)
-
-            for enemy in self.enemy:
-                if enemy.y > 860:
-                    del enemy
-                    continue
-                if enemy not in self.UNITLIST:
-                    self.UNITLIST.append(enemy)
 
             if player.y < 450:
                 coord = 25
