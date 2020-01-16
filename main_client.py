@@ -1,14 +1,14 @@
 import pygame
 from pygame.locals import *
-import ast
-import os
-import sys
-import time
 import random
 import math
 
 
 class Unit:
+    """
+    Класс, необходимый для создания платформ и других объектов.
+    Обладает функцией для рендеринга картинки
+    """
     def __init__(self, x, y, direction, num, obj, img=None, color=None, spring=None):
         self.x = x
         self.y = y
@@ -56,6 +56,9 @@ class Unit:
 
 
 class AnimatedSprite(pygame.sprite.Sprite):
+    """
+    Класс, взятый из учебника яндекс лицея, необходимый для смены спрайта игрока.
+    """
     def __init__(self, sheet, columns, rows):
         self.frames = []
         self.cut_sheet(sheet, columns, rows)
@@ -78,7 +81,24 @@ class AnimatedSprite(pygame.sprite.Sprite):
 
 
 class Hero:
+    """
+    Класс главного героя, содержит функции:
+    рисование главного героя,
+    коллизия с другими предметами/врагами,
+    физика прыжка,
+    установка нужного спрайта,
+    смерть персонажа при столкновении с врагом(враг должен находится сверху)
+    """
+
     def __init__(self, x, y, direction, num_id=None):
+        """
+        Входные данные для создания персонажа
+
+        :param x:
+        :param y:
+        :param direction:
+        :param num_id:
+        """
         self.K_MOVE = 0.7
         self.jump_force = 0
         self.x = x
@@ -86,6 +106,7 @@ class Hero:
         self.onGround = False
         self.spring_y = False
         self.onSpring = False
+        self.hero_death = False
         self.sprite = pygame.image.load('game_files/dodle_left.png').convert_alpha()
         if not (num_id is None):
             self.num_id = num_id
@@ -96,12 +117,20 @@ class Hero:
         self.width = 80
         self.speed = 15
         self.jump = 400
+        self.obj = 'hero'
 
     def collision(self, unit):
+        """
+        Коллизия с предметами, на вход подается класс.
+
+        :param unit:
+        :return:
+        """
         if unit.obj == 'enemy':
             if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
-                if unit.y + unit.height <= self.y + self.height < unit.y + unit.height:
+                if self.y + self.height >= unit.y >= self.y or unit.y + unit.height >= self.y >= unit.y:
                     self.death()
+                    return True
 
         elif unit.obj == 'ground':
             if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
@@ -123,9 +152,23 @@ class Hero:
         return False
 
     def set_sprite(self, img):
+        """
+        Установка спрайта, на вход картинка
+        :param img:
+        :return:
+        """
         self.sprite = img
 
     def move(self, forces, keys, UNITLIST=None):
+        """
+        Передвижение персонажа.
+        Физика прыжков, сила гравитации, передвижение вправо и влево
+
+        :param forces:
+        :param keys:
+        :param UNITLIST:
+        :return:
+        """
         result_force = [0, 0]
 
         for force in forces:
@@ -171,13 +214,26 @@ class Hero:
         return False
 
     def render(self, window):
+        """
+        Рисование персонажа на игровом поле
+        :param window:
+        :return:
+        """
         window.blit(self.sprite, (self.x, self.y))
 
     def death(self):
-        pass
+        """
+        Смерть персонажа при столкновении с врагом(враг должен находится над персонажем)
+        :return:
+        """
+        self.hero_death = True
 
 
 class Platform(Unit):
+    """
+    Класс платформы, заимствует все функции из класса UNIT
+    Отвечает за создание платформ разного цвета
+    """
     def __init__(self, x, y, image, num, spring):
         colors = ['green',
                   'blue',
@@ -186,6 +242,14 @@ class Platform(Unit):
 
 
 class Weapon:
+    """
+    Класс для работы с оружием(дулом у персонажа)
+    Функции:
+    Смена спрайта у игрока в зависимости от выстрела,
+    Коллизия с врагами(враги умирают, при столкновении с пулей),
+    Физика движения пули,
+    Рисование спрайта на игровом поле
+    """
     def __init__(self, hero_x, hero_y, mouse_pos):
         self.forces = [(0, 9 * 10)]
         self.K_MOVE = 0.8
@@ -204,6 +268,11 @@ class Weapon:
         self.angle = 0
 
     def render_shot_pic(self):
+        """
+        Меняет спрайт у персонажа в зависимости от
+        угла между начальными координатами персонажа и мышкой
+        :return:
+        """
         try:
             angle = (self.start_y - self.end_y) / (self.start_x - self.end_x)
         except:
@@ -231,6 +300,13 @@ class Weapon:
             return pygame.image.load('game_files/doodle_77_right.png')
 
     def collision(self, enemy):
+        """
+        Столкновение с врагом.
+        Пуля и враг при столкновении исчезают.
+        На вход подается список состоящий из объкектов врагов.
+        :param enemy:
+        :return:
+        """
         for unit in enemy:
             if self.x + self.width >= unit.x >= self.x or unit.x + unit.width >= self.x >= unit.x:
                 if unit.y <= self.y + self.height < unit.y + unit.height:
@@ -238,6 +314,12 @@ class Weapon:
         return False
 
     def move_bullet(self, forces):
+        """
+        Передвижение пули в соответсвии с законами физики.
+        На вход подается сила притяжения и другие действующие на пулю силы.
+        :param forces:
+        :return:
+        """
         result_force = [0, 0]
         for force in forces:
             result_force[0] += force[0]
@@ -258,11 +340,21 @@ class Weapon:
             self.y -= 20
 
     def render(self, window):
+        """
+        Рисование спрайта пули.
+        Вызывается функция для ее передвижения и смены координат
+        :param window:
+        :return:
+        """
         self.move_bullet(self.forces)
         window.blit(self.bullet_sprite, (self.x, self.y))
 
 
 class Enemy:
+    """
+    Класс для изображения на поле Врага.
+    Используется класс AnimatedSprite, для создания анимации движения врага
+    """
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -273,11 +365,22 @@ class Enemy:
         self.obj = 'enemy'
 
     def render(self, window):
+        """
+        Рисование спрайта врага.
+        Вызывается обновление спрайта у врага.
+        :param window:
+        :return:
+        """
         window.blit(self.enemy.image, (self.x, self.y))
         self.enemy.update()
 
 
 class Client:
+    """
+    Класс пользователя.
+    Отвечает за обработку и вывод изображения для пользователя.
+    Также отвечает за рисования стартовых и последующих платформ
+    """
     def __init__(self):
         self.plats = []
         self.UNITLIST = []
@@ -288,103 +391,162 @@ class Client:
         pygame.display.set_caption("Doodle jump")
         pygame.mouse.set_visible(False)
         window = pygame.display.set_mode((532, 850))
+        pygame.mixer.music.load('game_files/music.mp3')
+        pygame.mixer.music.play()
+        self.bg = pygame.image.load("game_files/background.png").convert_alpha()
+        self.MANUAL_CURSOR = pygame.image.load('game_files/arrow.png').convert_alpha()
         self.solo_game(window)
 
     def restart_game(self, window):
+        """
+        Перезапуск игры при нажатии на кнопку 'r'
+        :param window:
+        :return:
+        """
         self.plats = []
         self.UNITLIST = []
         self.all_bullets = []
         self.enemy = []
         self.account = 0
+        pygame.mixer.music.load('game_files/music.mp3')
+        pygame.mixer.music.play()
         self.solo_game(window)
 
     def solo_game(self, window):
-        bg = pygame.image.load("game_files/background.png").convert_alpha()
-        MANUAL_CURSOR = pygame.image.load('game_files/arrow.png').convert_alpha()
+        """
+        Одиночная игра.
+        Функция отвечает за рисование всех объектов на поле
+        :param window:
+        :return:
+        """
         clock = pygame.time.Clock()
         x = 250
         y = 600
         player = Hero(x, y, 0)
         run = True
-        cou = times = coord = 0
-        wait_between_bullets = 15
-        game_pause = False
+        wait_between_bullets = 5
         cost = 1500
         while run:
-            if not game_pause:
-                clock.tick(55)
-                window.blit(bg, (0, 0))
-                window.blit(MANUAL_CURSOR, (pygame.mouse.get_pos()))
-                pygame.display.set_caption(f"Your score - {str(self.account)}")
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        run = False
-                    elif (event.type == pygame.MOUSEBUTTONDOWN and
-                          pygame.mouse.get_pos()[1] < (player.y + 20) and wait_between_bullets > 15):
-                        wait_between_bullets = 0
-                        bullet = Weapon(player.x, player.y,
-                                        pygame.mouse.get_pos())
-                        player.set_sprite(bullet.render_shot_pic())
-                        self.all_bullets.append(bullet)
+            clock.tick(60)
+            window.blit(self.bg, (0, 0))
+            window.blit(self.MANUAL_CURSOR, (pygame.mouse.get_pos()))
+            pygame.display.set_caption(f"Your score - {str(self.account)}")
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+                elif (event.type == pygame.MOUSEBUTTONDOWN and
+                      pygame.mouse.get_pos()[1] < (player.y + 20) and wait_between_bullets > 15):
+                    wait_between_bullets = 0
+                    bullet = Weapon(player.x, player.y,
+                                    pygame.mouse.get_pos())
+                    player.set_sprite(bullet.render_shot_pic())
+                    self.all_bullets.append(bullet)
 
-                self.add_platforms()
-                wait_between_bullets += 1
-                self.bullets_collision()
+            self.add_platforms()
+            wait_between_bullets += 1
+            self.bullets_collision()
 
-                if self.account > cost:
-                    self.create_enemy()
-                    cost += random.randint(400, 2000)
+            if self.account > cost:
+                self.create_enemy()
+                cost += random.randint(400, 2000)
 
-                if pygame.key.get_pressed():
-                    if pygame.key.get_pressed()[pygame.K_r]:
-                        self.restart_game(window)
+            if pygame.key.get_pressed():
+                if pygame.key.get_pressed()[pygame.K_r]:
+                    self.restart_game(window)
+                    return
+                answer = player.move([(0, 7 * 10)], pygame.key.get_pressed(), UNITLIST=self.UNITLIST)
+                if answer:
+                    if player.hero_death:
+                        self.death(window)
                         return
-                    answer = player.move([(0, 7 * 10)], pygame.key.get_pressed(), UNITLIST=self.UNITLIST)
-                    if answer:
-                        if answer.obj == 'ground' and answer.spring:
-                            self.account += random.randint(150, 1000)
-                            coord = 30
-                            times = 22
-                            cou = 0
-                        else:
-                            self.account += random.randint(50, 200)
-                            coord = 10.5
-                            times = 21.5
-                            cou = 0
+                    elif answer.obj == 'ground' and answer.spring:
+                        self.account += random.randint(150, 1000)
+                    else:
+                        self.account += random.randint(50, 200)
 
-                self.UNITLIST.extend(self.all_bullets)
-                self.UNITLIST.append(player)
+            self.UNITLIST.extend(self.all_bullets)
+            self.UNITLIST.append(player)
 
-                for enemy in self.enemy:
-                    if enemy.y > 860:
-                        del enemy
-                        continue
-                    if enemy not in self.UNITLIST:
-                        self.UNITLIST.append(enemy)
+            for enemy in self.enemy:
+                if enemy.y > 860:
+                    del enemy
+                    continue
+                if enemy not in self.UNITLIST:
+                    self.UNITLIST.append(enemy)
 
-                if cou < times:
-                    cou += 1
-                    for unit in self.UNITLIST:
-                        unit.y += coord
-                        unit.spring_y += coord
-                else:
-                    cou = 0
-                    times = 0
-                    coord = 0
-
+            if player.y < 450:
+                coord = 25
                 for unit in self.UNITLIST:
-                    unit.render(window)
+                    unit.y += coord
+                    unit.spring_y += coord
 
-                self.UNITLIST = []
-                pygame.display.update()
-            if pygame.key.get_pressed()[pygame.K_ESCAPE]:
-                if game_pause:
-                    game_pause = False
-                else:
-                    game_pause = True
+            for unit in self.UNITLIST:
+                unit.render(window)
+            pygame.display.update()
+            if player.y > 770:
+                self.death(window)
+                return
+            self.UNITLIST = []
         pygame.quit()
 
+    def death(self, window):
+        """
+        Функция, вызывающаяся при смерти героя.
+        Рисует окно с результатами игры
+        :param window:
+        :return:
+        """
+        clock = pygame.time.Clock()
+        for i in range(30):
+            clock.tick(60)
+            window.blit(self.bg, (0, 0))
+            window.blit(self.MANUAL_CURSOR, (pygame.mouse.get_pos()))
+            for unit in self.UNITLIST:
+                if unit.obj != 'hero':
+                    unit.y -= 10
+                    unit.spring_y -= 10
+                else:
+                    unit.y -= 2
+            for unit in self.UNITLIST:
+                unit.render(window)
+            pygame.display.update()
+        for i in range(10):
+            clock.tick(60)
+            window.blit(self.bg, (0, 0))
+            window.blit(self.MANUAL_CURSOR, (pygame.mouse.get_pos()))
+            for unit in self.UNITLIST:
+                if unit.obj == 'hero':
+                    unit.y += 2
+            for unit in self.UNITLIST:
+                unit.render(window)
+            pygame.display.update()
+        window.blit(self.bg, (0, 0))
+        window.blit(self.MANUAL_CURSOR, (pygame.mouse.get_pos()))
+        font = pygame.font.Font(None, 40)
+        text = font.render("You're dead", True, (0, 0, 0))
+        score_text = font.render(f"Your score: {str(self.account)}", True, (0, 0, 0))
+        restart = font.render("If you want to play again", True, (0, 0, 0))
+        add_restart = font.render(" click the 'R'button", True, (0, 0, 0))
+        window.blit(text, (50, 50))
+        window.blit(score_text, (50, 100))
+        window.blit(restart, (50, 150))
+        window.blit(add_restart, (50, 200))
+        pygame.display.update()
+        run = True
+        while run:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+                    pygame.quit()
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                    self.restart_game(window)
+                    return
+
     def create_enemy(self):
+        """
+        Функция по созданию и размещению игроков на игровом поле
+        :return:
+        """
         green_plat = [pygame.image.load("game_files/green_platform.png").convert_alpha()]
         enemy_plat_y = self.plats[-1].y
 
@@ -401,6 +563,11 @@ class Client:
                 self.UNITLIST.append(self.enemy[-1])
 
     def bullets_collision(self):
+        """
+        Функция, которая проверяет вышла ли
+        пуля за границы игрового поля и проверка на столкновение с врагами
+        :return:
+        """
         for bullet in self.all_bullets:
             if bullet.x < 0 or bullet.y < 0 or bullet.x > 532 or bullet.y > 850:
                 del bullet
@@ -415,6 +582,10 @@ class Client:
                         break
 
     def add_platforms(self):
+        """
+        Функция для создания платформ и размещения их в рандомном порядке по игровому полю
+        :return:
+        """
         green_plat = [pygame.image.load("game_files/green_platform.png").convert_alpha()]
         blue_plat = [pygame.image.load("game_files/blue_platform.png").convert_alpha()]
         red_plat = [pygame.image.load("game_files/red_platform.png").convert_alpha(),
