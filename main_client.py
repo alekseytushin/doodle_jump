@@ -142,8 +142,6 @@ class Hero:
 
                         if unit.red:
                             unit.sprite = unit.img[1]
-                            self.onGround = False
-                            return False
                         self.y = unit.y - self.height
                         if unit.spring:
                             self.onSpring = True
