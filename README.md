@@ -1,7 +1,9 @@
+# Requirements
+
+## -> pip install pygame
+
+
 # Doodle jump
-
--> need to install module pygame!
-
 
 Игра doodle jump для компьютера!
 
