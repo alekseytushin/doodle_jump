@@ -1,6 +1,6 @@
 # Requirements
 
-## -> pip install pygame
+-> pip install pygame
 
 
 # Doodle jump
